@@ -12,9 +12,10 @@ import {
   TrendingUp,
   PackageCheck,
   Calendar,
-  CheckCircle2
+  CheckCircle2,
+  Search
 } from 'lucide-react';
-import { BloodGroup, InventoryItem } from '../types';
+import type { BloodGroup, InventoryItem } from '../types';
 import {
   BarChart,
   Bar,
@@ -34,25 +35,20 @@ export const BloodBankDashboard: React.FC = () => {
     addInventoryStock,
     updateInventoryStock,
     removeInventoryStock,
-    shortagePredictions,
   } = useApp();
 
-  // Pick current blood bank or fallback to first
   const currentBank = bloodBanks.find(b => b.id === currentUser.id) || bloodBanks[0];
-
   const bankInventory = inventory.filter(i => i.blood_bank_id === currentBank.id);
 
-  // Modal / form states for Add Stock
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<BloodGroup>('O+');
   const [unitsToAdd, setUnitsToAdd] = useState<number>(10);
   const [expiryDate, setExpiryDate] = useState<string>(() => {
     const d = new Date();
-    d.setDate(d.getDate() + 35); // standard ~35-42 days shelf life for RBC
+    d.setDate(d.getDate() + 35);
     return d.toISOString().split('T')[0];
   });
 
-  // Edit stock inline
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editUnits, setEditUnits] = useState<number>(0);
 
@@ -69,7 +65,6 @@ export const BloodBankDashboard: React.FC = () => {
     setEditingId(null);
   };
 
-  // Prepare chart data
   const chartData = bloodGroups.map(bg => {
     const item = bankInventory.find(i => i.blood_group === bg);
     const units = item ? item.units_available : 0;
@@ -83,188 +78,118 @@ export const BloodBankDashboard: React.FC = () => {
   const totalBankUnits = bankInventory.reduce((acc, i) => acc + i.units_available, 0);
 
   return (
-    <div className="space-y-6">
-      {/* Header with Blood Bank Info */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 text-slate-200">
+      {/* LEFT & CENTER (8 cols) */}
+      <div className="lg:col-span-8 space-y-6">
+        {/* Header Bar */}
+        <div className="p-6 rounded-3xl bg-[#1e1f25] border border-[#292a33] shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-200 border border-amber-300 dark:border-amber-700">
+              <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase bg-[#00d2c4]/10 text-[#00d2c4] border border-[#00d2c4]/30">
                 Authorized Transfusion Facility
               </span>
-              <span className="text-xs text-slate-400">License: {currentBank.license_number}</span>
+              <span className="text-xs text-slate-500">License: {currentBank.license_number}</span>
             </div>
-            <h1 className="text-2xl font-black text-slate-900 dark:text-white mt-1">
-              {currentBank.name}
-            </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex flex-wrap items-center gap-3">
-              <span>📍 {currentBank.address}, {currentBank.city}</span>
-              <span>📞 {currentBank.phone}</span>
-            </p>
+            <h1 className="text-xl font-black text-white mt-1.5 tracking-tight">{currentBank.name}</h1>
+            <p className="text-xs text-slate-400 mt-0.5">📍 {currentBank.address}, {currentBank.city}</p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md shadow-red-600/20 flex items-center gap-1.5 transition-all"
-            >
-              <Plus className="w-4 h-4" />
-              Add Stock Entry
-            </button>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2.5 rounded-2xl bg-[#00d2c4] hover:bg-[#00beaf] text-[#0d1217] font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-[#00d2c4]/20 transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Add Stock Lot
+          </button>
+        </div>
+
+        {/* Stock Chart styled in Dark Card */}
+        <div className="p-6 rounded-3xl bg-[#1e1f25] border border-[#292a33] shadow-md space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-extrabold text-white">Inventory Distribution Matrix</h3>
+            <span className="text-xs text-slate-400 font-bold">Total: {totalBankUnits} Units</span>
+          </div>
+
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.08} />
+                <XAxis dataKey="bloodGroup" tick={{ fontSize: 11, fill: '#8b8e9b' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#8b8e9b' }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#16171d',
+                    border: '1px solid #282a35',
+                    borderRadius: '12px',
+                    color: '#fff',
+                    fontSize: '11px',
+                  }}
+                />
+                <Bar dataKey="units" radius={[8, 8, 0, 0]}>
+                  {chartData.map((entry, index) => (
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={entry.units < 5 ? '#ef4444' : '#00d2c4'}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
-      </div>
 
-      {/* Overview Metric Tiles */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Total Available Inventory</span>
-          <div className="text-3xl font-black text-slate-900 dark:text-white mt-1">
-            {totalBankUnits} <span className="text-sm font-semibold text-slate-400">Units</span>
-          </div>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium mt-1">
-            Component testing & refrigeration validated (4°C)
-          </p>
-        </div>
+        {/* Detailed Table matching 'Patients Management' table */}
+        <div className="p-6 rounded-3xl bg-[#1e1f25] border border-[#292a33] shadow-md space-y-4">
+          <h3 className="text-base font-extrabold text-white">Full Inventory Matrix</h3>
 
-        <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Critical Low Stock Groups</span>
-          <div className="text-3xl font-black text-red-600 mt-1">
-            {chartData.filter(d => d.units < 5).length}{' '}
-            <span className="text-sm font-semibold text-slate-400">Groups Below Threshold</span>
-          </div>
-          <p className="text-[11px] text-red-500 mt-1">
-            Requires urgent donor mobilization camp scheduling
-          </p>
-        </div>
-
-        <div className="p-5 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Shortage Alert Status</span>
-          <div className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-2">
-            <AlertTriangle className="w-6 h-6 text-amber-500" />
-            Active Surveillance
-          </div>
-          <p className="text-[11px] text-slate-400 mt-1">
-            AI Shortage model synchronized with regional emergency requests
-          </p>
-        </div>
-      </div>
-
-      {/* Inventory Bar Chart & Analytics */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">
-              Inventory Distribution & Stock Level Chart
-            </h3>
-            <p className="text-xs text-slate-400">
-              Red bars indicate critically depleted stock (&lt; 5 units)
-            </p>
-          </div>
-          <span className="text-xs font-semibold px-2 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-            Real-Time Units
-          </span>
-        </div>
-
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
-              <XAxis dataKey="bloodGroup" tick={{ fontSize: 12, fill: '#64748b' }} />
-              <YAxis tick={{ fontSize: 12, fill: '#64748b' }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: '#0f172a',
-                  border: 'none',
-                  borderRadius: '12px',
-                  color: '#fff',
-                  fontSize: '12px',
-                }}
-              />
-              <Bar dataKey="units" radius={[8, 8, 0, 0]}>
-                {chartData.map((entry, index) => (
-                  <Cell
-                    key={`cell-${index}`}
-                    fill={entry.units < 5 ? '#ef4444' : '#3b82f6'}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Inventory Detailed Data Table */}
-      <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold text-slate-900 dark:text-white">
-            Full Inventory Matrix & Expiry Management
-          </h3>
-          <span className="text-xs text-slate-400">
-            {bankInventory.length} Managed Component Lots
-          </span>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 font-semibold uppercase tracking-wider">
-                <th className="pb-3 px-3">Blood Group</th>
-                <th className="pb-3 px-3">Units Available</th>
-                <th className="pb-3 px-3">Expiry Date</th>
-                <th className="pb-3 px-3">Status</th>
-                <th className="pb-3 px-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium text-slate-700 dark:text-slate-300">
-              {bankInventory.map(item => {
-                const isShortage = item.units_available < 5;
-                const isEditingThis = editingId === item.id;
-
-                return (
-                  <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="py-3 px-3">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg font-black text-xs bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-[#292a33] text-slate-400 font-bold uppercase text-[11px]">
+                  <th className="pb-3 px-3">Blood Group</th>
+                  <th className="pb-3 px-3">Units Available</th>
+                  <th className="pb-3 px-3">Expiry Date</th>
+                  <th className="pb-3 px-3">Status</th>
+                  <th className="pb-3 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#262832] font-medium text-slate-300">
+                {bankInventory.map(item => (
+                  <tr key={item.id} className="hover:bg-[#23242e] transition-colors">
+                    <td className="py-3 px-3 font-bold text-white">
+                      <span className="px-2.5 py-1 rounded-lg font-black text-xs bg-red-950/80 text-red-400 border border-red-800">
                         {item.blood_group}
                       </span>
                     </td>
-                    <td className="py-3 px-3">
-                      {isEditingThis ? (
+                    <td className="py-3 px-3 font-bold text-white text-sm">
+                      {editingId === item.id ? (
                         <div className="flex items-center gap-1.5">
                           <input
                             type="number"
-                            min="0"
                             value={editUnits}
                             onChange={e => setEditUnits(Number(e.target.value))}
-                            className="w-16 px-2 py-1 rounded-md border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs"
+                            className="w-16 px-2 py-1 rounded-lg bg-[#16171d] border border-[#282a35] text-xs text-white"
                           />
                           <button
                             onClick={() => handleSaveEdit(item.id)}
-                            className="px-2 py-1 bg-emerald-600 text-white rounded-md text-[10px] font-bold"
+                            className="px-2 py-1 bg-[#00d2c4] text-[#0d1217] rounded-md text-[10px] font-bold"
                           >
                             Save
                           </button>
                         </div>
                       ) : (
-                        <span className="font-bold text-sm text-slate-900 dark:text-white">
-                          {item.units_available} Units
-                        </span>
+                        `${item.units_available} Units`
                       )}
                     </td>
+                    <td className="py-3 px-3 text-slate-400">{item.expiry_date}</td>
                     <td className="py-3 px-3">
-                      <span className="flex items-center gap-1.5 text-slate-500">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {item.expiry_date}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3">
-                      {isShortage ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300">
-                          Critical Shortage
+                      {item.units_available < 5 ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-red-950 text-red-400 border border-red-800">
+                          Critical
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                          Normal Reserve
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-[#00d2c4]/15 text-[#00d2c4]">
+                          Adequate
                         </span>
                       )}
                     </td>
@@ -275,95 +200,107 @@ export const BloodBankDashboard: React.FC = () => {
                             setEditingId(item.id);
                             setEditUnits(item.units_available);
                           }}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
-                          title="Edit Stock"
+                          className="p-1 rounded-lg text-slate-400 hover:text-white"
                         >
                           <Edit className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => removeInventoryStock(item.id)}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                          title="Remove Stock"
+                          className="p-1 rounded-lg text-red-400 hover:text-red-300"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT COLUMN (4 cols) */}
+      <div className="lg:col-span-4 space-y-6">
+        <div className="p-6 rounded-3xl bg-[#1e1f25] border border-[#292a33] shadow-md space-y-4">
+          <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Inventory Status</span>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3.5 rounded-2xl bg-[#16171d] border border-[#282a35]">
+              <span className="text-2xl font-black text-white">{totalBankUnits}</span>
+              <p className="text-[11px] text-slate-400 mt-1">Total Units</p>
+            </div>
+            <div className="p-3.5 rounded-2xl bg-[#16171d] border border-[#282a35]">
+              <span className="text-2xl font-black text-red-400">{chartData.filter(d => d.units < 5).length}</span>
+              <p className="text-[11px] text-slate-400 mt-1">Low Stock Types</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Shortage Watch */}
+        <div className="p-6 rounded-3xl bg-[#1e1f25] border border-[#292a33] shadow-md space-y-4">
+          <h3 className="text-sm font-extrabold text-white">Shortage Alert Watch</h3>
+          <div className="p-3.5 rounded-2xl bg-[#16171d] border border-[#282a35] space-y-2 text-xs">
+            <div className="flex items-center gap-2 text-amber-400 font-bold">
+              <AlertTriangle className="w-4 h-4" />
+              Automated Surveillance
+            </div>
+            <p className="text-slate-400 text-[11px] leading-relaxed">
+              When emergency blood search Step 1 queries this bank, stock decrements in real time.
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Add Stock Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl p-6">
-            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">
-              Add Blood Inventory Lot
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">
-              Enter component testing units to append to facility reserve.
-            </p>
-
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl bg-[#1e1f25] border border-[#292a33] p-6 space-y-4 shadow-2xl">
+            <h3 className="text-base font-bold text-white">Add Blood Stock Lot</h3>
             <form onSubmit={handleAddStock} className="space-y-3.5">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Blood Group
-                </label>
+                <label className="block text-[11px] text-slate-400 mb-1">Blood Group</label>
                 <select
                   value={selectedGroup}
                   onChange={e => setSelectedGroup(e.target.value as BloodGroup)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-red-600"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-[#16171d] border border-[#282a35] text-red-400 font-bold"
                 >
-                  {bloodGroups.map(bg => (
-                    <option key={bg} value={bg}>{bg}</option>
-                  ))}
+                  {bloodGroups.map(bg => <option key={bg} value={bg}>{bg}</option>)}
                 </select>
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Units Available (Bags / 450ml)
-                </label>
+                <label className="block text-[11px] text-slate-400 mb-1">Units (Bags)</label>
                 <input
                   type="number"
                   min="1"
                   required
                   value={unitsToAdd}
                   onChange={e => setUnitsToAdd(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-[#16171d] border border-[#282a35] text-white"
                 />
               </div>
-
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                  Expiration Date
-                </label>
+                <label className="block text-[11px] text-slate-400 mb-1">Expiry Date</label>
                 <input
                   type="date"
                   required
                   value={expiryDate}
                   onChange={e => setExpiryDate(e.target.value)}
-                  className="w-full px-3 py-2 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+                  className="w-full px-3 py-2 text-xs rounded-xl bg-[#16171d] border border-[#282a35] text-white"
                 />
               </div>
-
-              <div className="flex justify-end gap-2 pt-3">
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300"
+                  className="px-4 py-2 text-xs text-slate-400"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-md"
+                  className="px-4 py-2 bg-[#00d2c4] text-[#0d1217] font-bold text-xs rounded-xl"
                 >
-                  Commit to Stock
+                  Commit Lot
                 </button>
               </div>
             </form>
